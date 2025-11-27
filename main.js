@@ -69,6 +69,15 @@ ipcMain.handle(
     return outputPath;
   }
 );
+ipcMain.handle('extract-stream', async (event, { filePath, streamIndex, codecType }) => {
+  if (!filePath || typeof streamIndex !== 'number') {
+    throw new Error('Invalid extraction payload.');
+  }
+
+  const outputPath = buildOutputPath(filePath, codecType, streamIndex);
+  await extractStream(filePath, streamIndex, outputPath);
+  return outputPath;
+});
 
 function probeStreams(filePath) {
   return new Promise((resolve, reject) => {
@@ -104,6 +113,10 @@ function buildOutputPath(filePath, codecType, codecName, streamIndex) {
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath, path.extname(filePath));
   const ext = pickExtension(codecType, codecName);
+function buildOutputPath(filePath, codecType, streamIndex) {
+  const dir = path.dirname(filePath);
+  const baseName = path.basename(filePath, path.extname(filePath));
+  const ext = pickExtension(codecType);
   const candidate = path.join(dir, `${baseName}-${codecType || 'stream'}-${streamIndex}${ext}`);
   return uniquePath(candidate);
 }
@@ -155,6 +168,17 @@ function pickExtension(codecType, codecName) {
   }
 
   return '.bin';
+function pickExtension(codecType) {
+  switch (codecType) {
+    case 'video':
+      return '.mp4';
+    case 'audio':
+      return '.aac';
+    case 'subtitle':
+      return '.srt';
+    default:
+      return '.bin';
+  }
 }
 
 function uniquePath(candidate) {
@@ -184,6 +208,7 @@ function extractStream(filePath, streamIndex, outputPath) {
     ffmpeg.stderr.on('data', (data) => {
       stderr += data.toString();
     });
+    const ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: 'ignore' });
 
     ffmpeg.on('error', (error) => reject(new Error(`无法启动 ffmpeg: ${error.message}`)));
     ffmpeg.on('close', (code) => {
@@ -192,6 +217,7 @@ function extractStream(filePath, streamIndex, outputPath) {
       } else {
         const reason = stderr.trim().split('\n').slice(-3).join(' ');
         reject(new Error(`ffmpeg 退出代码: ${code}${reason ? `，详情: ${reason}` : ''}`));
+        reject(new Error(`ffmpeg 退出代码: ${code}`));
       }
     });
   });
