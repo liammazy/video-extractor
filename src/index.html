@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>视频资源提取器</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>视频资源提取器</h1>
+      <p>选择视频文件，查看其中的视频、音频、字幕流并导出指定资源。</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="actions">
+          <button id="selectFile">选择视频文件</button>
+          <div class="file-info">
+            <span class="label">当前文件：</span>
+            <span id="fileName" class="value">未选择</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>资源列表</h2>
+        <div id="streamList" class="stream-list empty">请选择视频文件以查看资源。</div>
+      </section>
+
+      <section class="panel">
+        <h2>导出</h2>
+        <p>选中需要导出的资源后点击下方按钮。</p>
+        <button id="exportBtn" class="primary">导出所选资源</button>
+        <div id="status" class="status"></div>
+      </section>
+    </main>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
