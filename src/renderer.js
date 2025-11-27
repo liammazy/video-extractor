@@ -53,6 +53,7 @@ exportBtn.addEventListener('click', async () => {
       filePath: currentFile,
       streamIndex,
       codecType: stream?.codec_type,
+      codecName: stream?.codec_name,
     });
     statusBox.textContent = `导出完成：${outputPath}`;
   } catch (error) {

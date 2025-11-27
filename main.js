@@ -57,6 +57,18 @@ ipcMain.handle('probe-file', async (event, filePath) => {
   return streams;
 });
 
+ipcMain.handle(
+  'extract-stream',
+  async (event, { filePath, streamIndex, codecType, codecName }) => {
+    if (!filePath || typeof streamIndex !== 'number') {
+      throw new Error('Invalid extraction payload.');
+    }
+
+    const outputPath = buildOutputPath(filePath, codecType, codecName, streamIndex);
+    await extractStream(filePath, streamIndex, outputPath);
+    return outputPath;
+  }
+);
 ipcMain.handle('extract-stream', async (event, { filePath, streamIndex, codecType }) => {
   if (!filePath || typeof streamIndex !== 'number') {
     throw new Error('Invalid extraction payload.');
@@ -97,6 +109,10 @@ function probeStreams(filePath) {
   });
 }
 
+function buildOutputPath(filePath, codecType, codecName, streamIndex) {
+  const dir = path.dirname(filePath);
+  const baseName = path.basename(filePath, path.extname(filePath));
+  const ext = pickExtension(codecType, codecName);
 function buildOutputPath(filePath, codecType, streamIndex) {
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath, path.extname(filePath));
@@ -105,6 +121,53 @@ function buildOutputPath(filePath, codecType, streamIndex) {
   return uniquePath(candidate);
 }
 
+function pickExtension(codecType, codecName) {
+  const normalizedCodec = (codecName || '').toLowerCase();
+
+  if (codecType === 'video') {
+    // Matroska can carry most codecs without re-encoding, avoiding container/codec mismatches.
+    return '.mkv';
+  }
+
+  if (codecType === 'audio') {
+    const audioExtMap = {
+      aac: '.aac',
+      ac3: '.ac3',
+      eac3: '.eac3',
+      mp3: '.mp3',
+      flac: '.flac',
+      opus: '.opus',
+      vorbis: '.ogg',
+      pcm_s16le: '.wav',
+      pcm_s24le: '.wav',
+      dts: '.dts',
+      truehd: '.thd',
+    };
+
+    if (audioExtMap[normalizedCodec]) {
+      return audioExtMap[normalizedCodec];
+    }
+
+    return '.mka';
+  }
+
+  if (codecType === 'subtitle') {
+    const subExtMap = {
+      subrip: '.srt',
+      ass: '.ass',
+      webvtt: '.vtt',
+      dvb_subtitle: '.sup',
+      hdmv_pgs_subtitle: '.sup',
+    };
+
+    if (subExtMap[normalizedCodec]) {
+      return subExtMap[normalizedCodec];
+    }
+
+    return '.mks';
+  }
+
+  return '.bin';
 function pickExtension(codecType) {
   switch (codecType) {
     case 'video':
@@ -139,6 +202,12 @@ function uniquePath(candidate) {
 function extractStream(filePath, streamIndex, outputPath) {
   return new Promise((resolve, reject) => {
     const ffmpegArgs = ['-y', '-i', filePath, '-map', `0:${streamIndex}`, '-c', 'copy', outputPath];
+    const ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
     const ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: 'ignore' });
 
     ffmpeg.on('error', (error) => reject(new Error(`无法启动 ffmpeg: ${error.message}`)));
@@ -146,6 +215,8 @@ function extractStream(filePath, streamIndex, outputPath) {
       if (code === 0) {
         resolve();
       } else {
+        const reason = stderr.trim().split('\n').slice(-3).join(' ');
+        reject(new Error(`ffmpeg 退出代码: ${code}${reason ? `，详情: ${reason}` : ''}`));
         reject(new Error(`ffmpeg 退出代码: ${code}`));
       }
     });
